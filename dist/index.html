@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Scribe Studio</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="theme.css" />
+  </head>
+  <body>
+    <header>
+      <a href="./"
+        ><img src="icon.svg" width="27" height="27" alt="" />Scribe
+        <span>Studio</span></a
+      >
+    </header>
+    <main>
+      <aside>
+        <section class="card controls">
+          <label for="api-key">Ключ RouterAI</label>
+          <div class="key-field">
+            <input
+              id="api-key"
+              type="password"
+              placeholder="API-ключ"
+              autocomplete="off"
+              spellcheck="false"
+            /><button id="show-key" aria-label="Показать ключ" type="button">
+              <span
+                class="icon"
+                style="--icon: url(&quot;vendor/lucide/eye.svg&quot;)"
+                aria-hidden="true"
+              ></span>
+            </button>
+          </div>
+          <label class="dropzone" id="dropzone"
+            ><span
+              class="icon"
+              style="--icon: url(&quot;vendor/lucide/plus.svg&quot;)"
+              aria-hidden="true"
+            ></span
+            >Загрузить аудио<input
+              id="file-input"
+              type="file"
+              multiple
+              accept="audio/*,video/*,.m4a,.wav,.mp3,.flac,.ogg,.webm,.aac,.mp4,.mov,.mkv"
+          /></label>
+          <div id="selected-files"></div>
+          <button class="primary" id="start" type="button">
+            <span>Транскрибировать</span
+            ><span
+              class="icon"
+              style="--icon: url(&quot;vendor/lucide/arrow-up-right.svg&quot;)"
+              aria-hidden="true"
+            ></span>
+          </button>
+        </section>
+      </aside>
+      <section class="card transcripts">
+        <div class="list-heading">
+          <h1>Транскрипты <span id="history-count"></span></h1>
+        </div>
+        <div id="history"><div class="empty">Пока пусто.</div></div>
+        <article id="result" hidden>
+          <div class="result-heading">
+            <div>
+              <h2 id="result-name"></h2>
+              <span id="result-meta"></span>
+            </div>
+            <div class="download-controls">
+              <button id="copy" class="text-button">Копировать</button
+              ><select id="download-format" aria-label="Формат скачивания">
+                <option value="txt">TXT</option>
+                <option value="timed">Таймкоды</option>
+                <option value="json">JSON</option>
+                <option value="srt">SRT</option>
+                <option value="zip">ZIP</option></select
+              ><button
+                id="download"
+                class="secondary"
+                title="Скачать"
+                aria-label="Скачать"
+              >
+                <span
+                  class="icon"
+                  style="--icon: url(&quot;vendor/lucide/download.svg&quot;)"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            </div>
+          </div>
+          <div class="progress-wrap" id="progress-wrap" hidden>
+            <div>
+              <span id="job-state"></span><span id="job-percent"></span>
+            </div>
+            <progress id="progress" max="100"></progress
+            ><small>Не закрывайте вкладку.</small>
+          </div>
+          <div id="job-notice" class="notice" hidden></div>
+          <label id="retry-consent" hidden
+            ><input id="acknowledge" type="checkbox" />Проверил запрос в
+            RouterAI. Согласен на повтор с возможным новым списанием.</label
+          >
+          <div id="job-actions"></div>
+          <audio id="player" controls preload="metadata" hidden></audio>
+          <div id="transcript"></div>
+          <button id="load-more" class="secondary" hidden>Ещё</button>
+        </article>
+      </section>
+    </main>
+    <div id="toast" role="status" hidden></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

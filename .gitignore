@@ -1,0 +1,14 @@
+.venv/
+data/
+__pycache__/
+.env
+.env.*
+.DS_Store
+output/
+.playwright-cli/
+*.log
+node_modules/
+*.har
+*.wav
+*.m4a
+*.mp3

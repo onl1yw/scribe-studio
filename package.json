@@ -1,0 +1,31 @@
+{
+  "name": "scribe-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "preview": "python3 -m http.server 8790 --directory dist",
+    "format": "prettier --write README.md THIRD_PARTY.md package.json .github/workflows/*.yml 'dist/*.{js,css,html}' scripts/*.mjs tests/*.mjs",
+    "format:check": "prettier --check README.md THIRD_PARTY.md package.json .github/workflows/*.yml 'dist/*.{js,css,html}' scripts/*.mjs tests/*.mjs"
+  },
+  "dependencies": {
+    "@fontsource/doto": "5.3.0",
+    "fflate": "0.8.3",
+    "lucide-static": "1.59.0",
+    "mediabunny": "1.61.6"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  },
+  "description": "Browser-only audio transcription through ElevenLabs Scribe v2 via RouterAI.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onl1yw/scribe-studio.git"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
