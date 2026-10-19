@@ -7,7 +7,7 @@ import {
   WavOutputFormat,
   Conversion,
 } from "./vendor/mediabunny.mjs";
-import { MAX_BYTES } from "./core.js";
+import { MAX_BYTES } from "./core.js?v=20261019b";
 export async function openAudio(file) {
   const input = new Input({
     formats: ALL_FORMATS,

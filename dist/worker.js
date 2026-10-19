@@ -4,7 +4,7 @@ import {
   planChunks,
   normalizeChunk,
   MAX_BYTES,
-} from "./core.js";
+} from "./core.js?v=20261019b";
 import {
   getJob,
   patchJob,
@@ -16,9 +16,9 @@ import {
   markSending,
   completeChunk,
   hasPendingRequests,
-} from "./db.js";
-import { openAudio, wavChunk } from "./audio.js";
-import { runChunkPool, concurrencyLimit } from "./pool.js";
+} from "./db.js?v=20261019b";
+import { openAudio, wavChunk } from "./audio.js?v=20261019b";
+import { runChunkPool, concurrencyLimit } from "./pool.js?v=20261019b";
 let paused = false;
 const send = (job) => postMessage({ type: "update", job });
 async function request(blob, key, diarize) {

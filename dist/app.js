@@ -8,8 +8,8 @@ import {
   deleteJob,
   getSetting,
   setSetting,
-} from "./db.js";
-import { exportTexts, timestamp } from "./core.js";
+} from "./db.js?v=20261019b";
+import { exportTexts, timestamp } from "./core.js?v=20261019b";
 import { zipSync, strToU8 } from "./vendor/fflate.mjs";
 const $ = (id) => document.getElementById(id),
   element = (tag, text, cls) => {
@@ -224,7 +224,7 @@ async function execute(job, file, key, acknowledge = false) {
   await lockScreen();
   return new Promise((resolve, reject) => {
     let finished = false;
-    worker = new Worker(new URL("./worker.js", import.meta.url), {
+    worker = new Worker(new URL("./worker.js?v=20261019b", import.meta.url), {
       type: "module",
     });
     const finish = async () => {
