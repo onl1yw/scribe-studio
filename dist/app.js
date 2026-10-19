@@ -33,6 +33,7 @@ let records = [],
   files = [],
   selected = null,
   busy = false,
+  launching = false,
   worker = null,
   wakeLock = null,
   toastTimer,
@@ -70,8 +71,8 @@ async function fingerprint(file) {
     .map((v) => v.toString(16).padStart(2, "0"))
     .join("");
 }
-function choose(list) {
-  if (busy) return;
+function choose(list, force = false) {
+  if ((busy || launching) && !force) return;
   files = [...list].filter((f) => f.size);
   $("selected-files").replaceChildren();
   for (const [i, file] of files.entries()) {
@@ -129,7 +130,8 @@ function renderHistory() {
     remove.title = "Удалить запись";
     remove.setAttribute("aria-label", "Удалить " + job.filename);
     remove.onclick = async () => {
-      if (busy) return toast("Дождитесь завершения или остановите обработку.");
+      if (busy || launching)
+        return toast("Дождитесь завершения или остановите обработку.");
       if (!confirm("Удалить расшифровку из этого браузера?")) return;
       await deleteJob(job.id);
       sources.delete(job.id);
@@ -234,8 +236,8 @@ async function execute(job, file, key, acknowledge = false) {
       worker = null;
       busy = false;
       activeCounts.delete(job.id);
-      $("start").disabled = false;
-      $("concurrency").disabled = false;
+      $("start").disabled = launching;
+      $("concurrency").disabled = launching;
       await wakeLock?.release().catch(() => {});
       wakeLock = null;
       await refresh();
@@ -281,7 +283,28 @@ async function execute(job, file, key, acknowledge = false) {
     key = "";
   });
 }
-async function runExisting(job) {
+async function launch(action) {
+  if (busy || launching) return;
+  launching = true;
+  $("start").disabled = true;
+  $("concurrency").disabled = true;
+  try {
+    return await action();
+  } finally {
+    launching = false;
+    if (!busy) {
+      $("start").disabled = false;
+      $("concurrency").disabled = false;
+    }
+  }
+}
+function runExisting(job) {
+  return launch(() => resumeJob(job));
+}
+function start() {
+  return launch(startBatch);
+}
+async function resumeJob(job) {
   if (busy) return;
   const key = $("api-key").value.trim();
   if (!key) return toast("Введите ключ RouterAI.");
@@ -299,13 +322,13 @@ async function runExisting(job) {
   if (!file && !job.plan) return toast("Выберите исходный аудиофайл.");
   await execute(job, file, key, $("acknowledge").checked);
 }
-async function start() {
+async function startBatch() {
   if (busy) return;
   const key = $("api-key").value.trim();
   if (!key) return toast("Введите ключ RouterAI.");
   if (!files.length) {
     const current = selected ? await getJob(selected) : null;
-    if (current && current.status !== "complete") return runExisting(current);
+    if (current && current.status !== "complete") return resumeJob(current);
     return toast("Выберите аудио.");
   }
   try {
@@ -344,7 +367,7 @@ async function start() {
       const latest = await getJob(job.id);
       if (latest.status !== "complete") break;
     }
-    choose([]);
+    choose([], true);
   } catch (error) {
     toast(
       error.name === "QuotaExceededError"
