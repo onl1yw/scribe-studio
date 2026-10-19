@@ -10,7 +10,6 @@ import {
   setSetting,
 } from "./db.js";
 import { exportTexts, timestamp } from "./core.js";
-import { concurrencyLimit } from "./pool.js";
 import { zipSync, strToU8 } from "./vendor/fflate.mjs";
 const $ = (id) => document.getElementById(id),
   element = (tag, text, cls) => {
@@ -222,7 +221,6 @@ async function lockScreen() {
 async function execute(job, file, key, acknowledge = false) {
   busy = true;
   $("start").disabled = true;
-  $("concurrency").disabled = true;
   await lockScreen();
   return new Promise((resolve, reject) => {
     let finished = false;
@@ -237,7 +235,6 @@ async function execute(job, file, key, acknowledge = false) {
       busy = false;
       activeCounts.delete(job.id);
       $("start").disabled = launching;
-      $("concurrency").disabled = launching;
       await wakeLock?.release().catch(() => {});
       wakeLock = null;
       await refresh();
@@ -278,7 +275,6 @@ async function execute(job, file, key, acknowledge = false) {
       apiKey: key,
       acknowledge,
       diarize: true,
-      concurrency: concurrencyLimit($("concurrency").value),
     });
     key = "";
   });
@@ -287,14 +283,12 @@ async function launch(action) {
   if (busy || launching) return;
   launching = true;
   $("start").disabled = true;
-  $("concurrency").disabled = true;
   try {
     return await action();
   } finally {
     launching = false;
     if (!busy) {
       $("start").disabled = false;
-      $("concurrency").disabled = false;
     }
   }
 }
@@ -442,10 +436,6 @@ $("show-key").onclick = () => {
     show ? "Скрыть ключ" : "Показать ключ",
   );
 };
-$("concurrency").onchange = () =>
-  setSetting("concurrency", concurrencyLimit($("concurrency").value)).catch(
-    () => toast("Не удалось сохранить настройку."),
-  );
 $("api-key").oninput = () => {
   setSetting("api-key", $("api-key").value.trim()).catch(() =>
     toast("Не удалось сохранить ключ в браузере."),
@@ -512,9 +502,6 @@ try {
   if (!isSecureContext || !globalThis.indexedDB || !globalThis.Worker)
     throw new Error("Откройте страницу по HTTPS в современном браузере.");
   $("api-key").value = (await getSetting("api-key")) || "";
-  $("concurrency").value = concurrencyLimit(
-    (await getSetting("concurrency")) ?? 10,
-  );
   await recoverInterrupted();
   await refresh();
   if (records.length) await select(records[0].id);

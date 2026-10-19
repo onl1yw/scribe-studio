@@ -8,12 +8,12 @@
 :root {
   font-family: Arial, Helvetica, sans-serif;
   color: #24262a;
-  background: #e3e3e6;
+  background: #f4f3ed;
   --ink: #24262a;
   --accent: #ff512f;
   --accent-hover: #f04423;
-  --surface: #f5f4f2;
-  --border: #ceced1;
+  --surface: #fffefa;
+  --border: #d9d6ca;
   --muted: #717277;
 }
 header {
@@ -53,7 +53,7 @@ main {
   gap: 36px;
 }
 .card {
-  border-radius: 32px;
+  border-radius: 14px;
   background: var(--surface);
 }
 .controls {
@@ -86,8 +86,8 @@ h1,
   height: 56px;
   padding-left: 20px;
   padding-right: 58px;
-  border-radius: 999px;
-  border-color: #bdbdc2;
+  border-radius: 12px;
+  border-color: #c6c2b6;
   background: transparent;
   color: var(--ink);
   font-size: 14px;
@@ -116,8 +116,8 @@ button:focus-visible {
   min-height: 190px;
   gap: 18px;
   margin-bottom: 18px;
-  border: 1px solid #d0d0d3;
-  border-radius: 32px;
+  border: 1px solid #d8d4c7;
+  border-radius: 14px;
   background: var(--surface);
   color: var(--ink);
   font-size: 13px;
@@ -153,7 +153,7 @@ button:focus-visible {
   gap: 12px;
   min-height: 60px;
   padding: 18px 16px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--accent);
   color: #181a1d;
   font-size: 14px;
@@ -197,7 +197,7 @@ button:focus-visible {
   height: 24px;
   margin: 0;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--accent);
   color: #181a1d;
   font-size: 12px;
@@ -215,10 +215,10 @@ button:focus-visible {
 .history-item {
   min-height: 48px;
   padding: 14px 18px;
-  border-radius: 999px;
+  border-radius: 12px;
 }
 .history-item:hover {
-  background: #e9e8e6;
+  background: #edeae1;
 }
 .history-item.active {
   background: var(--ink);
@@ -253,7 +253,7 @@ button:focus-visible {
   height: 30px;
   padding: 0;
   border-radius: 50%;
-  background: #e5e4e3;
+  background: #e8e5db;
   color: #66686c;
 }
 .delete:hover,
@@ -264,7 +264,7 @@ button:focus-visible {
 .secondary,
 .text-button {
   border: 0;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 10px 14px;
   background: var(--accent);
   color: #181a1d;
@@ -301,9 +301,9 @@ button:focus-visible {
   width: 100%;
   max-width: none;
   border: 0;
-  border-radius: 26px;
+  border-radius: 14px;
   padding: 18px 30px 18px 18px;
-  background: #e5e3e0 url("./vendor/lucide/chevron-down.svg") right 12px
+  background: #e9e6db url("./vendor/lucide/chevron-down.svg") right 12px
     center / 18px no-repeat;
   color: var(--ink);
   font-size: 15px;
@@ -317,7 +317,7 @@ button:focus-visible {
   min-height: 112px;
   width: 100%;
   padding: 24px;
-  border-radius: 26px;
+  border-radius: 14px;
   background: var(--accent);
   color: #181a1d;
   font-family: Arial, Helvetica, sans-serif;
@@ -331,30 +331,6 @@ button:focus-visible {
 #download .icon {
   width: 38px;
   height: 38px;
-}
-.parallel-setting {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 6px 0 18px;
-}
-.parallel-setting label {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-}
-.parallel-setting select {
-  appearance: none;
-  min-width: 78px;
-  padding: 10px 30px 10px 16px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--surface) url("./vendor/lucide/chevron-down.svg") right 12px
-    center / 14px no-repeat;
-  font:
-    700 14px "Courier New",
-    monospace;
 }
 .segment button {
   color: #b33a22;
@@ -394,7 +370,7 @@ progress::-moz-progress-bar {
   color: #8b3221;
 }
 #toast {
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--ink);
   box-shadow: none;
 }
@@ -421,8 +397,8 @@ progress::-moz-progress-bar {
   margin: 0 22px 22px;
   padding: 8px 12px 8px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #e9e8e6;
+  border-radius: 12px;
+  background: #edeae1;
 }
 .audio-controls button {
   display: grid;
@@ -456,6 +432,14 @@ progress::-moz-progress-bar {
     grid-template-columns: 270px minmax(0, 1fr);
     gap: 24px;
   }
+  .download-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .download-controls select {
+    justify-self: end;
+    width: auto;
+    min-width: 90px;
+  }
 }
 @media (max-width: 620px) {
   header {
@@ -478,7 +462,7 @@ progress::-moz-progress-bar {
   }
   .card,
   .dropzone {
-    border-radius: 28px;
+    border-radius: 14px;
   }
   .list-heading {
     padding: 24px 22px 20px;
@@ -499,7 +483,7 @@ progress::-moz-progress-bar {
     width: auto;
     min-width: 90px;
     padding: 12px 28px 12px 16px;
-    border-radius: 999px;
+    border-radius: 12px;
     font-size: 12px;
     background-position: right 7px center;
     background-size: 14px;
@@ -507,7 +491,7 @@ progress::-moz-progress-bar {
   #download {
     min-height: 96px;
     padding: 18px 12px;
-    border-radius: 22px;
+    border-radius: 12px;
     gap: 10px;
     font-size: 30px;
     letter-spacing: -0.7px;

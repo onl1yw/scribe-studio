@@ -86,14 +86,8 @@ async function request(blob, key, diarize) {
     );
   }
 }
-async function run({
-  id,
-  file,
-  apiKey,
-  acknowledge = false,
-  diarize = true,
-  concurrency = 10,
-}) {
+async function run({ id, file, apiKey, acknowledge = false, diarize = true }) {
+  const concurrency = 10;
   let input,
     active = 0,
     failed = false,
