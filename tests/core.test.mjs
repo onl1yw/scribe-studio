@@ -94,3 +94,36 @@ test("real browser-side conversion code creates a standalone bounded WAV", async
     await rm(folder, { recursive: true, force: true });
   }
 });
+
+test("out-of-order parallel responses assemble into one chronological file", () => {
+  const plan = planChunks(1800),
+    texts = ["Первая часть.", "Вторая часть.", "Третья часть."];
+  const chunks = plan.map((part) => ({
+    ...part,
+    response: { text: texts[part.number] },
+    segments: normalizeChunk(
+      {
+        text: texts[part.number],
+        words: [{ word: texts[part.number], start: 10, end: 11 }],
+      },
+      part,
+      plan[part.number + 1],
+    ),
+  }));
+  const output = exportTexts({ filename: "session.wav", total: 3 }, [
+    chunks[2],
+    chunks[0],
+    chunks[1],
+  ]);
+  assert.equal(output.txt, texts.join("\n\n"));
+  assert.deepEqual(
+    JSON.parse(output.json).chunks.map((c) => c.number),
+    [0, 1, 2],
+  );
+  assert.ok(
+    output.srt.indexOf("00:00:10,000") < output.srt.indexOf("00:10:08,000"),
+  );
+  assert.ok(
+    output.srt.indexOf("00:10:08,000") < output.srt.indexOf("00:20:08,000"),
+  );
+});

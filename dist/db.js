@@ -77,6 +77,16 @@ export const putJob = (job) =>
   transaction(["jobs"], "readwrite", (tx) =>
     tx.objectStore("jobs").put({ ...job, updated: Date.now() }),
   );
+export const patchJob = (id, fields) =>
+  transaction(["jobs"], "readwrite", (tx, set) => {
+    const store = tx.objectStore("jobs"),
+      request = store.get(id);
+    request.onsuccess = () => {
+      const job = { ...request.result, ...fields, updated: Date.now() };
+      store.put(job);
+      set(job);
+    };
+  });
 export const getChunks = (id) =>
   transaction(["chunks"], "readonly", (tx, set) => {
     const r = tx.objectStore("chunks").index("job").getAll(id);
@@ -86,6 +96,23 @@ export const getChunk = (id, number) =>
   transaction(["chunks"], "readonly", (tx, set) => {
     const r = tx.objectStore("chunks").get([id, number]);
     r.onsuccess = () => set(r.result);
+  });
+export const hasPendingRequests = (id) =>
+  transaction(["chunks"], "readonly", (tx, set) => {
+    const request = tx
+      .objectStore("chunks")
+      .index("job")
+      .openCursor(IDBKeyRange.only(id));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return set(false);
+      if (
+        ["sending", "unknown"].includes(cursor.value.status) &&
+        !cursor.value.response
+      )
+        return set(true);
+      cursor.continue();
+    };
   });
 export const getViews = (id, limit = 100) =>
   transaction(["views"], "readonly", (tx, set) => {
@@ -119,6 +146,61 @@ export const commitChunk = (job, chunk) =>
         number: chunk.number,
         segments: chunk.segments,
       });
+  });
+export const markSending = (chunk) =>
+  transaction(["jobs", "chunks"], "readwrite", (tx, set) => {
+    const jobs = tx.objectStore("jobs"),
+      request = jobs.get(chunk.job);
+    tx.objectStore("chunks").put({
+      ...chunk,
+      status: "sending",
+      dispatched: Date.now(),
+    });
+    request.onsuccess = () => {
+      const job = {
+        ...request.result,
+        status: "transcribing",
+        current: chunk.number,
+        updated: Date.now(),
+      };
+      jobs.put(job);
+      set(job);
+    };
+  });
+// Read and increment inside the same transaction: parallel responses must not
+// overwrite each other's progress, and saving a response twice is idempotent.
+export const completeChunk = (chunk) =>
+  transaction(["jobs", "chunks", "views"], "readwrite", (tx, set) => {
+    const chunks = tx.objectStore("chunks"),
+      jobs = tx.objectStore("jobs");
+    const previous = chunks.get([chunk.job, chunk.number]);
+    previous.onsuccess = () => {
+      const request = jobs.get(chunk.job);
+      request.onsuccess = () => {
+        const job = request.result;
+        if (!previous.result?.response) {
+          const cost = chunk.response.usage?.cost;
+          job.cost =
+            Number.isFinite(cost) && (!job.done || Number.isFinite(job.cost))
+              ? (job.cost || 0) + cost
+              : null;
+          job.done = (job.done || 0) + 1;
+          job.segment_count = (job.segment_count || 0) + chunk.segments.length;
+          job.has_untimed =
+            !!job.has_untimed ||
+            chunk.segments.some((segment) => !segment.timed);
+          job.updated = Date.now();
+          chunks.put(chunk);
+          tx.objectStore("views").put({
+            job: chunk.job,
+            number: chunk.number,
+            segments: chunk.segments,
+          });
+          jobs.put(job);
+        }
+        set(job);
+      };
+    };
   });
 async function folder(job, create = false) {
   const root = await navigator.storage.getDirectory();

@@ -7,15 +7,18 @@ import {
 } from "./core.js";
 import {
   getJob,
-  putJob,
+  patchJob,
   getChunk,
   putChunk,
   saveAudio,
   getAudio,
   deleteAudio,
-  commitChunk,
+  markSending,
+  completeChunk,
+  hasPendingRequests,
 } from "./db.js";
 import { openAudio, wavChunk } from "./audio.js";
+import { runChunkPool, concurrencyLimit } from "./pool.js";
 let paused = false;
 const send = (job) => postMessage({ type: "update", job });
 async function request(blob, key, diarize) {
@@ -83,107 +86,153 @@ async function request(blob, key, diarize) {
     );
   }
 }
-async function run({ id, file, apiKey, acknowledge = false, diarize = true }) {
+async function run({
+  id,
+  file,
+  apiKey,
+  acknowledge = false,
+  diarize = true,
+  concurrency = 10,
+}) {
   let input,
-    job = await getJob(id),
-    sending = null;
+    active = 0,
+    failed = false,
+    job = await getJob(id);
   try {
-    if (job.status === "unknown" && !acknowledge)
-      throw new Error("Сначала подтвердите повтор неподтверждённого запроса.");
+    if (
+      (job.status === "unknown" || (await hasPendingRequests(id))) &&
+      !acknowledge
+    )
+      throw Object.assign(
+        new Error("Сначала подтвердите повтор неподтверждённых запросов."),
+        { unknown: true },
+      );
+    send(
+      await patchJob(id, {
+        status: "preparing",
+        error: null,
+        concurrency: concurrencyLimit(concurrency),
+      }),
+    );
     if (file) {
-      job.status = "preparing";
-      job.error = null;
-      await putJob(job);
-      send(job);
       const audio = await openAudio(file);
       input = audio.input;
-      job.duration = audio.duration;
-      job.plan = planChunks(audio.duration);
-      job.total = job.plan.length;
-      await putJob(job);
+      const plan = planChunks(audio.duration);
+      job = await patchJob(id, {
+        duration: audio.duration,
+        plan,
+        total: plan.length,
+      });
     }
-    if (!job.plan) throw new Error("Выберите исходный аудиофайл.");
-    for (const part of job.plan) {
-      let chunk = await getChunk(id, part.number);
-      if (chunk?.response) continue;
-      if (paused) {
-        job.status = "paused";
-        await putJob(job);
-        send(job);
-        return;
-      }
-      let blob = await getAudio(id, part.number);
-      if (!blob) {
-        if (!input) {
-          job.status = "needs_file";
-          job.error = "Выберите тот же аудиофайл, чтобы продолжить.";
-          await putJob(job);
-          send(job);
-          return;
+    if (!job.plan)
+      throw Object.assign(new Error("Выберите исходный аудиофайл."), {
+        needsFile: true,
+      });
+    const result = await runChunkPool(job.plan, {
+      limit: concurrency,
+      shouldStop: () => paused || failed,
+      onActive: (count) => {
+        active = count;
+        postMessage({ type: "active", id, count });
+      },
+      prepare: async (part) => {
+        let chunk = await getChunk(id, part.number);
+        if (chunk?.response) return null;
+        let blob = await getAudio(id, part.number);
+        if (!blob) {
+          if (!input)
+            throw Object.assign(
+              new Error("Выберите тот же аудиофайл, чтобы продолжить."),
+              { needsFile: true },
+            );
+          send(
+            await patchJob(id, {
+              status: active ? "transcribing" : "preparing",
+              current: part.number,
+            }),
+          );
+          blob = await wavChunk(input, part, (progress) =>
+            postMessage({
+              type: "progress",
+              id,
+              number: part.number,
+              progress,
+              active,
+            }),
+          );
+          await saveAudio(id, part.number, blob);
+          chunk = { job: id, ...part, status: "prepared" };
+          await putChunk(chunk);
         }
-        job.status = "preparing";
-        job.current = part.number;
-        await putJob(job);
-        send(job);
-        blob = await wavChunk(input, part, (progress) =>
-          postMessage({ type: "progress", id, number: part.number, progress }),
-        );
-        await saveAudio(id, part.number, blob);
-        chunk = { job: id, ...part, status: "prepared" };
-        await putChunk(chunk);
-      } else if (!chunk) {
-        chunk = { job: id, ...part, status: "prepared" };
-      }
-      job.status = "transcribing";
-      job.current = part.number;
-      job.error = null;
-      chunk.status = "sending";
-      chunk.dispatched = Date.now();
-      await commitChunk(job, chunk);
-      sending = part.number;
-      send(job);
-      const result = await request(blob, apiKey, diarize);
-      chunk.response = result.data;
-      chunk.generation_id = result.generation_id;
-      chunk.status = "done";
-      chunk.segments = normalizeChunk(
-        result.data,
-        part,
-        job.plan[part.number + 1],
-      );
-      const cost = result.data.usage?.cost;
-      job.cost =
-        Number.isFinite(cost) && (!job.done || Number.isFinite(job.cost))
-          ? (job.cost || 0) + cost
-          : null;
-      job.done = (job.done || 0) + 1;
-      job.segment_count = (job.segment_count || 0) + chunk.segments.length;
-      job.status = "transcribing";
-      await commitChunk(job, chunk);
-      sending = null;
-      send(job);
-      await deleteAudio(id, part.number);
-    }
-    job.status = "complete";
-    job.error = null;
-    await putJob(job);
-    send(job);
+        return {
+          part,
+          blob,
+          chunk: chunk || { job: id, ...part, status: "prepared" },
+        };
+      },
+      execute: async ({ part, blob, chunk }) => {
+        let dispatched = false;
+        try {
+          send(await markSending(chunk));
+          if (paused || failed) {
+            await putChunk({ ...chunk, status: "prepared" });
+            return;
+          }
+          dispatched = true;
+          const result = await request(blob, apiKey, diarize);
+          const completed = {
+            ...chunk,
+            response: result.data,
+            generation_id: result.generation_id,
+            status: "done",
+            segments: normalizeChunk(
+              result.data,
+              part,
+              job.plan[part.number + 1],
+            ),
+          };
+          send(await completeChunk(completed));
+          dispatched = false;
+          await deleteAudio(id, part.number);
+        } catch (error) {
+          failed = true;
+          if (dispatched) {
+            error.unknown = !!error.unknown || !error.rejected;
+            const latest = await getChunk(id, part.number);
+            if (latest && !latest.response) {
+              latest.status = error.unknown ? "unknown" : "rejected";
+              await putChunk(latest);
+            }
+          }
+          throw error;
+        }
+      },
+    });
+    const error =
+      result.errors.find((error) => error.unknown) || result.errors[0];
+    if (error) throw error;
+    job = await getJob(id);
+    send(
+      await patchJob(id, {
+        status: job.done === job.total ? "complete" : "paused",
+        error: null,
+      }),
+    );
   } catch (error) {
-    if (sending !== null) {
-      error.unknown = error.unknown || !error.rejected;
-      const chunk = await getChunk(id, sending);
-      if (chunk && !chunk.response) {
-        chunk.status = error.unknown ? "unknown" : "rejected";
-        await putChunk(chunk);
-      }
-    }
-    job.status = error.unknown ? "unknown" : "error";
-    job.error =
+    const status = error.unknown
+      ? "unknown"
+      : error.needsFile
+        ? "needs_file"
+        : "error";
+    const message =
       error.name === "QuotaExceededError"
         ? "Недостаточно места в хранилище браузера. Готовые результаты сохранены."
         : error.message;
-    await putJob(job).catch(() => {});
-    send(job);
+    const saved = await patchJob(id, { status, error: message }).catch(
+      () => null,
+    );
+    if (saved) send(saved);
+    else postMessage({ type: "failure", message });
   } finally {
     input?.dispose();
     apiKey = "";

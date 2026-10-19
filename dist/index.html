@@ -11,9 +11,9 @@
   </head>
   <body>
     <header>
-      <a href="./"
-        ><img src="icon.svg" width="27" height="27" alt="" />Scribe
-        <span>Studio</span></a
+      <a href="./" aria-label="Scribe Studio"
+        ><span class="brand-word">Scribe</span
+        ><span class="brand-word">Studio</span></a
       >
     </header>
     <main>
@@ -36,11 +36,11 @@
             </button>
           </div>
           <label class="dropzone" id="dropzone"
-            ><span
-              class="icon"
-              style="--icon: url(&quot;vendor/lucide/plus.svg&quot;)"
-              aria-hidden="true"
-            ></span
+            ><span class="upload-symbol" aria-hidden="true"
+              ><span
+                class="icon"
+                style="--icon: url(&quot;vendor/lucide/plus.svg&quot;)"
+              ></span></span
             >Загрузить аудио<input
               id="file-input"
               type="file"
@@ -48,6 +48,21 @@
               accept="audio/*,video/*,.m4a,.wav,.mp3,.flac,.ogg,.webm,.aac,.mp4,.mov,.mkv"
           /></label>
           <div id="selected-files"></div>
+          <div class="parallel-setting">
+            <label for="concurrency">Одновременно</label
+            ><select id="concurrency" aria-label="Одновременных фрагментов">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+              <option value="10" selected>10</option>
+            </select>
+          </div>
           <button class="primary" id="start" type="button">
             <span>Транскрибировать</span
             ><span
@@ -69,27 +84,23 @@
               <h2 id="result-name"></h2>
               <span id="result-meta"></span>
             </div>
-            <div class="download-controls">
-              <button id="copy" class="text-button">Копировать</button
-              ><select id="download-format" aria-label="Формат скачивания">
-                <option value="txt">TXT</option>
-                <option value="timed">Таймкоды</option>
-                <option value="json">JSON</option>
-                <option value="srt">SRT</option>
-                <option value="zip">ZIP</option></select
-              ><button
-                id="download"
-                class="secondary"
-                title="Скачать"
-                aria-label="Скачать"
-              >
-                <span
-                  class="icon"
-                  style="--icon: url(&quot;vendor/lucide/download.svg&quot;)"
-                  aria-hidden="true"
-                ></span>
-              </button>
-            </div>
+          </div>
+          <div class="download-controls" hidden>
+            <select id="download-format" aria-label="Формат скачивания">
+              <option value="txt">TXT</option>
+              <option value="timed">Таймкоды</option>
+              <option value="json">JSON</option>
+              <option value="srt">SRT</option>
+              <option value="zip">ZIP</option>
+            </select>
+            <button id="download" type="button">
+              <span id="download-label">Скачать файл</span
+              ><span
+                class="icon"
+                style="--icon: url(&quot;vendor/lucide/download.svg&quot;)"
+                aria-hidden="true"
+              ></span>
+            </button>
           </div>
           <div class="progress-wrap" id="progress-wrap" hidden>
             <div>
@@ -124,8 +135,6 @@
             <span id="audio-time">00:00 / 00:00</span>
             <audio id="player" preload="metadata" hidden></audio>
           </div>
-          <div id="transcript"></div>
-          <button id="load-more" class="secondary" hidden>Ещё</button>
         </article>
       </section>
     </main>

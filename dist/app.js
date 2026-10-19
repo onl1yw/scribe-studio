@@ -4,11 +4,13 @@ import {
   putJob,
   getChunks,
   getViews,
+  hasPendingRequests,
   deleteJob,
   getSetting,
   setSetting,
 } from "./db.js";
 import { exportTexts, timestamp } from "./core.js";
+import { concurrencyLimit } from "./pool.js";
 import { zipSync, strToU8 } from "./vendor/fflate.mjs";
 const $ = (id) => document.getElementById(id),
   element = (tag, text, cls) => {
@@ -33,11 +35,10 @@ let records = [],
   busy = false,
   worker = null,
   wakeLock = null,
-  output = null,
-  visibleSegments = 100,
   toastTimer,
   mediaURL = null;
-const sources = new Map();
+const sources = new Map(),
+  activeCounts = new Map();
 function icon(name) {
   const span = element("span", null, "icon");
   span.setAttribute("aria-hidden", "true");
@@ -144,7 +145,6 @@ function renderHistory() {
 }
 async function select(id) {
   selected = id;
-  visibleSegments = 100;
   $("acknowledge").checked = false;
   $("result").hidden = false;
   await refresh();
@@ -179,7 +179,7 @@ async function renderJob(job) {
   $("progress").value = job.total ? (100 * (job.done || 0)) / job.total : 0;
   $("job-state").textContent = LABELS[job.status];
   $("job-percent").textContent = job.total
-    ? `${job.done || 0} / ${job.total}`
+    ? `${job.done || 0} / ${job.total}${activeCounts.get(job.id) > 1 ? " · " + activeCounts.get(job.id) + " одновременно" : ""}`
     : "";
   $("job-notice").hidden = !job.error;
   $("job-notice").textContent = job.error || "";
@@ -189,7 +189,7 @@ async function renderJob(job) {
     const pause = element("button", "Остановить", "secondary");
     pause.onclick = () => {
       worker?.postMessage({ type: "pause" });
-      toast("Остановимся после сохранения текущего фрагмента.");
+      toast("Дождёмся сохранения уже отправленных фрагментов.");
     };
     $("job-actions").append(pause);
   }
@@ -198,47 +198,19 @@ async function renderJob(job) {
     resume.onclick = () => runExisting(job);
     $("job-actions").append(resume);
   }
-  const chunks = await getViews(job.id, visibleSegments);
-  if (selected !== job.id) return;
-  output = exportTexts(job, chunks);
-  const hasText = output.segments.length > 0;
-  document.querySelector(".download-controls").hidden = !hasText;
+  document.querySelector(".download-controls").hidden = !job.done;
+  $("download-label").textContent =
+    job.status === "complete"
+      ? "Скачать файл"
+      : `Скачать · ${job.done || 0}/${job.total}`;
+  $("download").title =
+    job.status === "complete"
+      ? "Скачать всю расшифровку одним файлом"
+      : "Скачать готовые фрагменты";
   $("download-format").querySelector('[value="srt"]').disabled =
-    !output.segments.length || output.segments.some((s) => !s.timed);
+    !!job.has_untimed;
   if ($("download-format").selectedOptions[0]?.disabled)
     $("download-format").value = "txt";
-  $("transcript").replaceChildren();
-  for (const segment of output.segments.slice(0, visibleSegments)) {
-    const row = element("div", null, "segment"),
-      seek = element("button", timestamp(segment.start));
-    seek.type = "button";
-    seek.title = segment.timed
-      ? "Слушать с этого момента"
-      : "Начало аудиофрагмента";
-    seek.onclick = () => {
-      if (!sources.has(job.id))
-        return toast("Выберите исходное аудио для воспроизведения.");
-      $("player").currentTime = segment.start;
-      $("player")
-        .play()
-        .catch(() => {});
-    };
-    const content = element("div");
-    if (segment.speaker != null)
-      content.append(
-        element(
-          "small",
-          (job.total > 1 ? "Фрагмент " + segment.chunk + " · " : "") +
-            "Говорящий " +
-            segment.speaker,
-        ),
-      );
-    content.append(element("p", segment.text));
-    row.append(seek, content);
-    $("transcript").append(row);
-  }
-  $("load-more").hidden =
-    visibleSegments >= (job.segment_count ?? output.segments.length);
 }
 async function lockScreen() {
   try {
@@ -248,16 +220,22 @@ async function lockScreen() {
 async function execute(job, file, key, acknowledge = false) {
   busy = true;
   $("start").disabled = true;
+  $("concurrency").disabled = true;
   await lockScreen();
   return new Promise((resolve, reject) => {
+    let finished = false;
     worker = new Worker(new URL("./worker.js", import.meta.url), {
       type: "module",
     });
     const finish = async () => {
+      if (finished) return;
+      finished = true;
       worker?.terminate();
       worker = null;
       busy = false;
+      activeCounts.delete(job.id);
       $("start").disabled = false;
+      $("concurrency").disabled = false;
       await wakeLock?.release().catch(() => {});
       wakeLock = null;
       await refresh();
@@ -267,7 +245,14 @@ async function execute(job, file, key, acknowledge = false) {
       const data = event.data;
       if (data.type === "update") {
         await refresh();
-      } else if (data.type === "progress" && selected === data.id) {
+      } else if (data.type === "active") {
+        activeCounts.set(data.id, data.count);
+        await refresh();
+      } else if (
+        data.type === "progress" &&
+        selected === data.id &&
+        !data.active
+      ) {
         $("job-state").textContent = "Подготовка";
         $("job-percent").textContent = `${Math.round(data.progress * 100)}%`;
       } else if (data.type === "finished") {
@@ -291,6 +276,7 @@ async function execute(job, file, key, acknowledge = false) {
       apiKey: key,
       acknowledge,
       diarize: true,
+      concurrency: concurrencyLimit($("concurrency").value),
     });
     key = "";
   });
@@ -372,9 +358,7 @@ async function recoverInterrupted() {
   if (locks?.held?.some((l) => l.name === "scribe-studio-processing")) return;
   for (const job of await jobs())
     if (["preparing", "transcribing"].includes(job.status)) {
-      const unknown = (await getChunks(job.id)).some(
-        (c) => c.status === "sending" && !c.response,
-      );
+      const unknown = await hasPendingRequests(job.id);
       job.status = unknown ? "unknown" : "paused";
       job.error = unknown
         ? "Вкладка закрылась во время запроса. Проверьте списание в RouterAI перед повтором."
@@ -391,7 +375,7 @@ function save(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 async function download() {
-  if (!output) return;
+  if (!selected) return;
   const job = await getJob(selected),
     fmt = $("download-format").value,
     stem = job.filename.replace(/\.[^.]+$/, "");
@@ -401,6 +385,8 @@ async function download() {
       ? getChunks(job.id)
       : getViews(job.id, Infinity)),
   );
+  if (fmt === "srt" && full.segments.some((segment) => !segment.timed))
+    return toast("В ответе API нет таймкодов. Выберите TXT или JSON.");
   if (fmt === "zip") {
     const files = {
       "transcript.txt": strToU8(full.txt),
@@ -433,6 +419,10 @@ $("show-key").onclick = () => {
     show ? "Скрыть ключ" : "Показать ключ",
   );
 };
+$("concurrency").onchange = () =>
+  setSetting("concurrency", concurrencyLimit($("concurrency").value)).catch(
+    () => toast("Не удалось сохранить настройку."),
+  );
 $("api-key").oninput = () => {
   setSetting("api-key", $("api-key").value.trim()).catch(() =>
     toast("Не удалось сохранить ключ в браузере."),
@@ -485,21 +475,7 @@ for (const name of ["dragleave", "drop"])
   });
 $("dropzone").addEventListener("drop", (e) => choose(e.dataTransfer.files));
 $("start").onclick = () => start().catch((e) => toast(e.message));
-$("download").onclick = download;
-$("copy").onclick = async () => {
-  try {
-    const job = await getJob(selected),
-      full = exportTexts(job, await getViews(job.id, Infinity));
-    await navigator.clipboard.writeText(full.txt);
-    toast("Скопировано.");
-  } catch {
-    toast("Можно скачать TXT.");
-  }
-};
-$("load-more").onclick = async () => {
-  visibleSegments += 100;
-  await renderJob(await getJob(selected));
-};
+$("download").onclick = () => download().catch((error) => toast(error.message));
 addEventListener("beforeunload", (event) => {
   if (busy) {
     event.preventDefault();
@@ -513,6 +489,9 @@ try {
   if (!isSecureContext || !globalThis.indexedDB || !globalThis.Worker)
     throw new Error("Откройте страницу по HTTPS в современном браузере.");
   $("api-key").value = (await getSetting("api-key")) || "";
+  $("concurrency").value = concurrencyLimit(
+    (await getSetting("concurrency")) ?? 10,
+  );
   await recoverInterrupted();
   await refresh();
   if (records.length) await select(records[0].id);

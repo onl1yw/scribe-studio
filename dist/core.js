@@ -137,6 +137,7 @@ export function trimRepeatedPhrase(previous, text) {
   return text;
 }
 export function exportTexts(job, chunks) {
+  chunks = [...chunks].sort((a, b) => a.number - b.number);
   let previous = "";
   const segments = [];
   for (const chunk of chunks)

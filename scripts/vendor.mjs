@@ -8,11 +8,11 @@ for (const [from, to] of [
 ])
   await copyFile("node_modules/" + from, "dist/vendor/" + to);
 await copyFile(
-  "node_modules/@fontsource/doto/files/doto-latin-700-normal.woff2",
+  "node_modules/@fontsource-variable/doto/files/doto-latin-full-normal.woff2",
   "dist/vendor/doto.woff2",
 );
 await copyFile(
-  "node_modules/@fontsource/doto/LICENSE",
+  "node_modules/@fontsource-variable/doto/LICENSE",
   "dist/vendor/doto.LICENSE",
 );
 await mkdir("dist/vendor/lucide", { recursive: true });
