@@ -24,6 +24,9 @@ for (const name of [
   "arrow-up-right",
   "download",
   "audio-lines",
+  "play",
+  "pause",
+  "chevron-down",
 ]) {
   await copyFile(
     `node_modules/lucide-static/icons/${name}.svg`,

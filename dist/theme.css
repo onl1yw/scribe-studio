@@ -279,3 +279,40 @@ audio {
   width: 16px;
   height: 16px;
 }
+.audio-controls {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 22px 20px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.audio-controls button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+.audio-controls input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  accent-color: #dc1823;
+  cursor: pointer;
+}
+#audio-time {
+  font:
+    10px "Courier New",
+    monospace;
+  color: #607567;
+  white-space: nowrap;
+}
+.download-controls select {
+  appearance: none;
+  padding-right: 24px;
+  background: url("./vendor/lucide/chevron-down.svg") right 6px center / 13px
+    no-repeat;
+}

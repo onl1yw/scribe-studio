@@ -104,7 +104,26 @@
             RouterAI. Согласен на повтор с возможным новым списанием.</label
           >
           <div id="job-actions"></div>
-          <audio id="player" controls preload="metadata" hidden></audio>
+          <div id="audio-controls" class="audio-controls" hidden>
+            <button id="play-pause" type="button" aria-label="Слушать">
+              <span
+                class="icon"
+                style="--icon: url(&quot;vendor/lucide/play.svg&quot;)"
+                aria-hidden="true"
+              ></span>
+            </button>
+            <input
+              id="audio-position"
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value="0"
+              aria-label="Позиция аудио"
+            />
+            <span id="audio-time">00:00 / 00:00</span>
+            <audio id="player" preload="metadata" hidden></audio>
+          </div>
           <div id="transcript"></div>
           <button id="load-more" class="secondary" hidden>Ещё</button>
         </article>

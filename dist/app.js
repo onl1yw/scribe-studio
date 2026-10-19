@@ -151,10 +151,14 @@ async function select(id) {
   const file = sources.get(id);
   if (mediaURL) URL.revokeObjectURL(mediaURL);
   mediaURL = null;
-  $("player").hidden = !file;
+  $("audio-controls").hidden = !file;
+  $("player").pause();
   if (file) {
     mediaURL = URL.createObjectURL(file);
     $("player").src = mediaURL;
+  } else {
+    $("player").removeAttribute("src");
+    $("player").load();
   }
 }
 async function renderJob(job) {
@@ -433,6 +437,40 @@ $("api-key").oninput = () => {
   setSetting("api-key", $("api-key").value.trim()).catch(() =>
     toast("Не удалось сохранить ключ в браузере."),
   );
+};
+function updatePlayer() {
+  const player = $("player"),
+    duration = Number.isFinite(player.duration) ? player.duration : 0;
+  $("audio-position").max = duration || 1;
+  $("audio-position").value = player.currentTime || 0;
+  $("audio-time").textContent = [player.currentTime, duration]
+    .map((t) => timestamp(t).replace(/^00:/, ""))
+    .join(" / ");
+  $("play-pause").replaceChildren(icon(player.paused ? "play" : "pause"));
+  $("play-pause").setAttribute(
+    "aria-label",
+    player.paused ? "Слушать" : "Пауза",
+  );
+}
+for (const name of [
+  "loadedmetadata",
+  "timeupdate",
+  "play",
+  "pause",
+  "ended",
+  "emptied",
+]) {
+  $("player").addEventListener(name, updatePlayer);
+}
+$("play-pause").onclick = () => {
+  if ($("player").paused)
+    $("player")
+      .play()
+      .catch(() => toast("Не удалось воспроизвести аудио."));
+  else $("player").pause();
+};
+$("audio-position").oninput = () => {
+  $("player").currentTime = Number($("audio-position").value);
 };
 $("file-input").onchange = (e) => choose(e.target.files);
 for (const name of ["dragenter", "dragover"])
